@@ -1,0 +1,19 @@
+{
+  "name": "kardasz/calendly",
+  "description": "Simple Calendly Library",
+  "type": "library",
+  "authors": [
+    {
+      "name": "Krzysztof Kardasz",
+      "email": "krzysztof@kardasz.eu"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Calendly\\": "src/Calendly/"
+    }
+  },
+  "require": {
+    "php": ">=5.6"
+  }
+}
