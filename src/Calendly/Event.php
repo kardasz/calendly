@@ -120,4 +120,13 @@ class Event
     {
         $this->repeatInterval = $repeatInterval;
     }
+
+    /**
+     *
+     */
+    public function __clone()
+    {
+        $this->from = clone  $this->from;
+        $this->to = clone $this->to;
+    }
 }
