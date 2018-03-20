@@ -6,7 +6,7 @@ namespace Calendly;
  * Class EventCollection
  * @package Calendly
  */
-class EventCollection implements \Iterator
+class EventCollection implements \Iterator, \JsonSerializable
 {
     /**
      * @var Event[]
@@ -19,9 +19,22 @@ class EventCollection implements \Iterator
     private $position = 0;
 
     /**
+     * @var \Closure
+     */
+    private $jsonSerializer;
+
+    /**
+     * @param \Closure $jsonSerializer
+     */
+    public function setJsonSerializer(\Closure $jsonSerializer)
+    {
+        $this->jsonSerializer = $jsonSerializer;
+    }
+
+    /**
      * @param Event $event
      */
-    public function add (Event $event)
+    public function add(Event $event)
     {
         $this->collection[] = $event;
     }
@@ -88,5 +101,20 @@ class EventCollection implements \Iterator
     public function rewind()
     {
         reset($this->collection);
+    }
+
+    /**
+     * Specify data which should be serialized to JSON
+     * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
+     * @return mixed data which can be serialized by <b>json_encode</b>,
+     * which is a value of any type other than a resource.
+     * @since 5.4.0
+     */
+    public function jsonSerialize()
+    {
+        if (null !== $this->jsonSerializer) {
+            return call_user_func($this->jsonSerializer, $this);
+        }
+        return $this->collection;
     }
 }

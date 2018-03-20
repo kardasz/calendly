@@ -45,6 +45,7 @@ class Calendar implements \IteratorAggregate
 
     /**
      * @param Event $event
+     * @throws \Exception
      */
     public function addEvent(Event $event)
     {
@@ -59,55 +60,74 @@ class Calendar implements \IteratorAggregate
         $this->processRepetition($event);
     }
 
-    private function processRepetition (Event $event)
+    /**
+     * @param Event $event
+     * @throws \Exception
+     */
+    private function processRepetition(Event $event)
     {
-        if ($event->isRepeat()) {
+        if ($event->isRepeatable()) {
             $shift = $event->getFrom()->diff($this->from, true);
             $duration = $event->getFrom()->diff($event->getTo(), true);
+            $unitCount = 1;
             switch ($event->getRepeatFrequency()) {
                 case Event::FREQUENCY_DAY:
-                    $shiftDays = (int)$shift->format("%a");
-                    $repeatedEvent = clone $event;
-                    $multiplier = floor($shiftDays/$event->getRepeatInterval());
-                    $options = null;
-                    if ($multiplier > 0) {
-                        $shiftInterval = new \DateInterval(sprintf(
-                            "P%dD", ($multiplier*$event->getRepeatInterval())
-                        ));
-                        $repeatedEvent->getFrom()->add($shiftInterval);
-                        $repeatedEvent->getTo()->add($shiftInterval);
-                        $options = \DatePeriod::EXCLUDE_START_DATE;
-                    }
-
-                    $interval = new \DateInterval(sprintf(
-                        "P%dD", $event->getRepeatInterval()
-                    ));
-
-                    $period = new \DatePeriod(clone $repeatedEvent->getFrom(), $interval, $this->to, $options);
-                    foreach ($period as $date) {
-                        $eventCopy = clone $repeatedEvent;
-                        $eventCopy->setFrom($date);
-                        $eventCopy->setTo((clone $date)->add($duration));
-
-                        $this->collection->add($eventCopy);
-                    }
-
-
-                break;
+                    $unitShiftFormat = '%a';
+                    $periodFormat = 'P%dD';
+                    break;
                 case Event::FREQUENCY_WEEK:
-
-
+                    $unitShiftFormat = '%a';
+                    $periodFormat = 'P%dD';
+                    $unitCount = 7;
                     break;
                 case Event::FREQUENCY_MONTH:
-
-
+                    $unitShiftFormat = '%m';
+                    $periodFormat = 'P%dM';
                     break;
+                case Event::FREQUENCY_YEAR:
+                    $unitShiftFormat = '%y';
+                    $periodFormat = 'P%dY';
+                    break;
+
+                default:
+                    throw new \Exception(
+                        sprintf('Unknown "%s" frequency unit', $event->getRepeatFrequency())
+                    );
             }
 
+            $shiftUnit = (int)$shift->format($unitShiftFormat);
+            $repeatedEvent = clone $event;
 
+            $intervalMultiplier = ceil($shiftUnit/$unitCount/$event->getRepeatInterval());
+            if ($intervalMultiplier > 0) {
+                $shiftInterval = new \DateInterval(sprintf(
+                    $periodFormat,
+                    ($intervalMultiplier*$unitCount*$event->getRepeatInterval())
+                ));
+                $repeatedEvent->getFrom()->add($shiftInterval);
+                $repeatedEvent->getTo()->add($shiftInterval);
+            }
+            $interval = new \DateInterval(sprintf(
+                $periodFormat,
+                $event->getRepeatInterval() * $unitCount
+            ));
+
+            $repeatFrom = (clone $repeatedEvent->getFrom())->add($interval);
+
+            if ($repeatFrom > $this->to) {
+                return ;
+            }
+
+            $period = new \DatePeriod($repeatFrom, $interval, $this->to);
+            foreach ($period as $date) {
+                $eventCopy = clone $repeatedEvent;
+                $eventCopy->setFrom($date);
+                $eventCopy->setTo((clone $date)->add($duration));
+
+                $this->collection->add($eventCopy);
+            }
         }
     }
-
     /**
      * @return EventCollection
      */
@@ -123,8 +143,20 @@ class Calendar implements \IteratorAggregate
      * <b>Traversable</b>
      * @since 5.0.0
      */
-    public function getIterator()
+    public function getIterator() : Traversable
     {
         return $this->collection;
+    }
+
+    /**
+     * Specify data which should be serialized to JSON
+     * @link http://php.net/manual/en/jsonserializable.jsonserialize.php
+     * @return mixed data which can be serialized by <b>json_encode</b>,
+     * which is a value of any type other than a resource.
+     * @since 5.4.0
+     */
+    public function jsonSerialize()
+    {
+        return $this->getCollection()->jsonSerialize();
     }
 }
